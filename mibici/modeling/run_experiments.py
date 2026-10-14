@@ -115,12 +115,14 @@ def load_manifest() -> tuple[dict, str]:
 
 
 def setup_tracking() -> None:
-    """Configura MLflow para guardar los experimentos localmente."""
-    tracking_dir = PROJ_ROOT / "mlruns"
-    tracking_dir.mkdir(parents=True, exist_ok=True)
+    """Configura MLflow con SQLite como backend local."""
+    db_path = PROJ_ROOT / "mlflow.db"
+    tracking_uri = f"sqlite:///{db_path.as_posix()}"
 
-    mlflow.set_tracking_uri(tracking_dir.resolve().as_uri())
+    mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
+
+    logger.info(f"Base de datos de MLflow: {db_path}")
 
 
 def log_run_context(
