@@ -204,3 +204,6 @@ mlartifacts/
 *.pth
 *.h5
 *.keras
+
+# Base de datos SQLite local de MLflow
+/mlflow.db*
