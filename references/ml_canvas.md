@@ -1,4 +1,4 @@
-
+﻿
 # ML Canvas — Proyecto MiBici, Equipo 47
 
 ## 1. Problema y propuesta de valor
@@ -46,7 +46,7 @@ La métrica principal propuesta es MAE, porque expresa el error medio en número
 - **Usuario:** equipo de rebalanceo.
 - **Decisión:** priorizar estaciones para revisión operativa y posible rebalanceo.
 - **Baseline:** `DummyClassifier(strategy="most_frequent")`.
-- **Modelos candidatos:** Logistic Regression y Random Forest Classifier.
+- **Modelos candidatos:** Logistic Regression, Random Forest Classifier y HistGradientBoosting. El modelo final seleccionado fue HistGradientBoosting.
 - **Métricas:** precisión, recall, F1, balanced accuracy y matriz de confusión.
 
 El recall de la clase de riesgo será importante porque los falsos negativos pueden ocultar estaciones que merecen atención. La precisión ayudará a evaluar cuántas alertas generadas corresponden a casos positivos según la etiqueta utilizada.
@@ -63,7 +63,7 @@ El recall de la clase de riesgo será importante porque los falsos negativos pue
 - **Datos de entrada:** promedios de llegadas y salidas diarias, flujo neto, actividad en días laborales y fines de semana, proporciones horarias, capacidad y coordenadas geográficas.
 - **Usuario:** equipo de planeación urbana.
 - **Decisión:** comparar perfiles de uso y estudiar la distribución espacial de las estaciones.
-- **Baseline:** K-Means con cuatro grupos.
+- **Baseline:** K-Means con cuatro grupos. Para el modelo final se utilizó K-Means con tres grupos; ambos resultados deben distinguirse al comparar la evaluación inicial con la selección final.
 - **Métricas:** silhouette score e inercia, complementadas con el tamaño y la interpretación de cada grupo.
 
 Las coordenadas geográficas forman parte de las variables utilizadas por el baseline, por lo que la similitud entre estaciones depende tanto de sus características de uso como de su posición geográfica. Se deberá considerar esta decisión al interpretar los grupos.

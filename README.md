@@ -1,4 +1,4 @@
-# Proyecto MiBici — Equipo 47
+﻿# Proyecto MiBici — Equipo 47
 
 Proyecto integrador de Machine Learning para analizar los viajes del sistema de bicicletas públicas MiBici de Guadalajara, Jalisco. El proyecto incluye ingesta reproducible de datos, ingeniería de variables, experimentos de regresión, clasificación y clustering, y seguimiento de experimentos con MLflow.
 
@@ -284,10 +284,29 @@ Sustituir `p1-model-iniciales` por la pregunta y las iniciales del integrante. U
 
 No se deben subir los CSV originales, los Parquet, `.env`, `.venv`, la base local de MLflow ni los modelos serializados generados durante los experimentos.
 
-## 12. Próximos pasos
+## 12. Estado actual y próximos pasos
 
-- Implementar modelos candidatos para P1, P2 y P3.
-- Comparar cada modelo con su baseline mediante las métricas apropiadas.
-- Seleccionar los modelos usando entrenamiento y validación.
-- Evaluar la selección final sobre el conjunto de prueba reservado.
-- Documentar los experimentos y resultados en el informe final.
+### Trabajo realizado
+
+- Implementación y ejecución de experimentos baseline para P1, P2 y P3.
+- Entrenamiento y comparación de modelos candidatos mediante los scripts de modelado.
+- Selección de modelos finales con base en los criterios de evaluación establecidos.
+- Registro de experimentos, métricas y artefactos en MLflow.
+- Registro de los resultados de candidatos y de evidencias visuales en `reports/`.
+- Entrenamiento y registro de los modelos finales para las tres preguntas.
+- Preparación de los cambios en la rama `feat/mlflow-project-advanced` y apertura de un Pull Request dirigido a `main`.
+
+### Pendientes
+
+- Revisar los resultados y la documentación con el equipo.
+- Verificar que el informe final explique los criterios de selección, las métricas y las limitaciones de cada modelo.
+- Confirmar que las evidencias del repositorio sean suficientes para los requisitos de la entrega.
+- Atender los comentarios y las solicitudes de cambios del Pull Request.
+- Integrar los cambios en `main` después de obtener la aprobación requerida.
+
+### Consideraciones
+
+- P1 y P2 deben evaluarse respetando la separación cronológica entre entrenamiento, validación y prueba.
+- La etiqueta de riesgo de P2 es una aproximación; no representa observaciones históricas reales de estaciones vacías o llenas.
+- Los grupos de P3 son descriptivos y dependen de las variables utilizadas, incluidas las coordenadas geográficas.
+- La base de datos local de MLflow, los datos originales, los Parquet y los modelos serializados deben permanecer fuera de GitHub.
