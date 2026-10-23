@@ -1,0 +1,7 @@
+﻿python: "3.14.7"
+
+build_dependencies:
+  - pip
+
+dependencies:
+  - -r requirements.txt

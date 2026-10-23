@@ -1,0 +1,22 @@
+﻿name: mibici
+
+python_env: python_env.yaml
+
+entry_points:
+  ingest:
+    command: "python -m mibici.dataset"
+
+  train:
+    parameters:
+      question: {type: string, default: "ALL"}
+      n_clusters: {type: int, default: 4}
+    command: "python -m mibici.modeling.run_experiments --question {question} --n-clusters {n_clusters}"
+
+  candidates_p1:
+    command: "python -m mibici.modeling.run_candidates_p1"
+
+  candidates_p2:
+    command: "python -m mibici.modeling.run_candidates_p2"
+
+  candidates_p3:
+    command: "python -m mibici.modeling.run_candidates_p3"
