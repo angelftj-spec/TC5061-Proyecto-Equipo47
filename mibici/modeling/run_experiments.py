@@ -1,4 +1,3 @@
-
 """Experimentos baseline reproducibles de MiBici con MLflow."""
 
 from __future__ import annotations
@@ -31,6 +30,7 @@ from sklearn.metrics import (
     recall_score,
 )
 from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
 
 from mibici.config import (
     DATA_END_MONTH,
@@ -219,6 +219,7 @@ def run_p1(manifest: dict, manifest_hash: str, git_info: dict[str, str]) -> None
 
     with mlflow.start_run(run_name=run_name):
         log_run_context("P1", manifest, manifest_hash, git_info)
+        mlflow.set_tag("stage_of_work", "baseline")
         mlflow.log_params(
             {
                 "model_type": "DummyRegressor",
@@ -330,6 +331,7 @@ def run_p2(manifest: dict, manifest_hash: str, git_info: dict[str, str]) -> None
 
     with mlflow.start_run(run_name=run_name):
         log_run_context("P2", manifest, manifest_hash, git_info)
+        mlflow.set_tag("stage_of_work", "baseline")
         mlflow.log_params(
             {
                 "model_type": "DummyClassifier",
@@ -445,6 +447,7 @@ def run_p3(
 
     with mlflow.start_run(run_name=run_name):
         log_run_context("P3", manifest, manifest_hash, git_info)
+        mlflow.set_tag("stage_of_work", "baseline")
         mlflow.log_params(
             {
                 "model_type": "KMeans",
@@ -511,6 +514,126 @@ def run_p3(
     logger.success("Run de P3 registrado en MLflow.")
 
 
+def run_p3_final(
+    manifest: dict,
+    manifest_hash: str,
+    git_info: dict[str, str],
+) -> None:
+    """Entrena y registra el modelo final K-Means de P3 con 3 clusters."""
+    path = FEATURES_DIR / "p3_clustering.parquet"
+    if not path.is_file():
+        raise FileNotFoundError(f"No se encontró {path}. Ejecuta features.py.")
+
+    frame = pd.read_parquet(path)
+    numeric_columns = [
+        column
+        for column in frame.select_dtypes(include="number").columns
+        if frame[column].notna().any()
+    ]
+    if not numeric_columns:
+        raise ValueError("No se encontraron variables numéricas para clustering.")
+
+    features = frame[numeric_columns].replace([np.inf, -np.inf], np.nan)
+    pipeline = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", StandardScaler()),
+            (
+                "kmeans",
+                KMeans(n_clusters=3, random_state=RANDOM_SEED, n_init=20),
+            ),
+        ]
+    )
+    pipeline.fit(features)
+    labels = pipeline.named_steps["kmeans"].labels_
+    scaled = pipeline[:-1].transform(features)
+    model = pipeline.named_steps["kmeans"]
+
+    from sklearn.metrics import silhouette_score
+
+    silhouette = float(silhouette_score(scaled, labels))
+    assignments = frame.copy()
+    assignments["cluster"] = labels
+    counts = pd.Series(labels).value_counts().sort_index()
+
+    with mlflow.start_run(run_name="P3-final-kmeans-k3"):
+        log_run_context("P3", manifest, manifest_hash, git_info)
+        mlflow.set_tag("stage_of_work", "final")
+        mlflow.set_tag("model_family", "KMeans")
+        mlflow.log_params(
+            {
+                "model_type": "KMeans",
+                "n_clusters": 3,
+                "n_init": 20,
+                "random_state": RANDOM_SEED,
+                "scaling": "SimpleImputer_median_then_StandardScaler",
+                "feature_columns": ",".join(numeric_columns),
+                "n_features": len(numeric_columns),
+                "n_stations": len(frame),
+                "selection_reason": "Highest silhouette among evaluated candidates; prefer simpler k=3 over k=4 with nearly identical silhouette",
+            }
+        )
+        mlflow.log_metrics(
+            {
+                "silhouette_score": silhouette,
+                "inertia": float(model.inertia_),
+                "smallest_cluster_size": int(counts.min()),
+                "largest_cluster_size": int(counts.max()),
+                "cluster_size_ratio": float(counts.max() / counts.min()),
+            }
+        )
+        for cluster_id, count in counts.items():
+            mlflow.log_metric(f"cluster_{cluster_id}_stations", int(count))
+
+        # Registra el pipeline completo (imputación + escalado + K-Means).
+        mlflow.sklearn.log_model(
+            sk_model=pipeline,
+            artifact_path="model",
+            input_example=features.head(5),
+            serialization_format="cloudpickle",
+        )
+
+        artifact_columns = [
+            column
+            for column in (
+                "station_id",
+                "nombre_estacion",
+                "latitud",
+                "longitud",
+                "capacidad",
+                "cluster",
+            )
+            if column in assignments.columns
+        ]
+
+        with tempfile.TemporaryDirectory(prefix="mibici_p3_final_") as temp:
+            temp_path = Path(temp)
+            csv_path = temp_path / "p3_final_station_clusters.csv"
+            assignments[artifact_columns].to_csv(csv_path, index=False)
+            mlflow.log_artifact(str(csv_path), artifact_path="evaluation")
+
+            fig, ax = plt.subplots(figsize=(9, 7))
+            scatter = ax.scatter(
+                assignments["longitud"],
+                assignments["latitud"],
+                c=labels,
+                cmap="tab10",
+                s=18,
+                alpha=0.85,
+            )
+            ax.set_xlabel("Longitud")
+            ax.set_ylabel("Latitud")
+            ax.set_title("P3 final: perfiles de estaciones con K-Means (k=3)")
+            fig.colorbar(scatter, ax=ax, label="Cluster")
+            fig.tight_layout()
+            plot_path = temp_path / "p3_final_station_clusters.png"
+            fig.savefig(plot_path, dpi=150)
+            plt.close(fig)
+            mlflow.log_artifact(str(plot_path), artifact_path="evaluation")
+
+    logger.success("Modelo final P3 (K-Means, k=3) registrado en MLflow.")
+
+
 @app.command()
 def main(
     question: str = typer.Option(
@@ -548,6 +671,9 @@ def main(
 
     if question in {"ALL", "P3"}:
         run_p3(manifest, manifest_hash, git_info, n_clusters)
+
+    if question == "P3":
+        run_p3_final(manifest, manifest_hash, git_info)
 
     logger.success("Experimentos solicitados terminados.")
 
