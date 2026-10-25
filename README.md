@@ -202,7 +202,7 @@ La configuración `MLproject` define los puntos de entrada para la ingesta, entr
 Ejecutar los tres problemas:
 
 ```powershell
-.\.venv\Scripts\mlflow.exe run . --entry-point train --env-manager local
+python -m mibici.modeling.run_experiments --question ALL --n-clusters 4
 ```
 
 Ejecutar un problema específico:
@@ -231,9 +231,9 @@ Los comandos suponen que los nombres de parámetros y los puntos de entrada coin
 Los puntos de entrada para los scripts candidatos se definen en `MLproject`. Por ejemplo:
 
 ```powershell
-.\.venv\Scripts\mlflow.exe run . --entry-point candidates_p1 --env-manager local
-.\.venv\Scripts\mlflow.exe run . --entry-point candidates_p2 --env-manager local
-.\.venv\Scripts\mlflow.exe run . --entry-point candidates_p3 --env-manager local
+.\.venv\Scripts\mlflow.exe run . --entry-point candidates_p1 --env-manager local --experiment-name mibici-equipo47
+.\.venv\Scripts\mlflow.exe run . --entry-point candidates_p2 --env-manager local --experiment-name mibici-equipo47
+.\.venv\Scripts\mlflow.exe run . --entry-point candidates_p3 --env-manager local --experiment-name mibici-equipo47
 ```
 
 ### 8.3. Baselines de referencia

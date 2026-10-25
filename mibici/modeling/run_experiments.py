@@ -6,6 +6,7 @@ import hashlib
 import json
 import subprocess
 import tempfile
+import os
 from pathlib import Path
 
 import matplotlib
@@ -19,6 +20,8 @@ from loguru import logger
 from sklearn.cluster import KMeans
 from sklearn.dummy import DummyClassifier, DummyRegressor
 from sklearn.impute import SimpleImputer
+from mlflow.models import ModelSignature
+from mlflow.types.schema import Schema, ColSpec, TensorSpec
 from sklearn.metrics import (
     accuracy_score,
     balanced_accuracy_score,
@@ -121,6 +124,8 @@ def setup_tracking() -> None:
 
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
+
+    os.environ.pop("MLFLOW_RUN_ID", None)
 
     logger.info(f"Base de datos de MLflow: {db_path}")
 
@@ -533,7 +538,11 @@ def run_p3_final(
     if not numeric_columns:
         raise ValueError("No se encontraron variables numéricas para clustering.")
 
-    features = frame[numeric_columns].replace([np.inf, -np.inf], np.nan)
+    features = (
+        frame[numeric_columns]
+        .replace([np.inf, -np.inf], np.nan)
+        .astype("float64")
+    )
     pipeline = Pipeline(
         steps=[
             ("imputer", SimpleImputer(strategy="median")),
@@ -585,12 +594,24 @@ def run_p3_final(
         for cluster_id, count in counts.items():
             mlflow.log_metric(f"cluster_{cluster_id}_stations", int(count))
 
+        signature = ModelSignature(
+            inputs=Schema([
+                ColSpec("double", column)
+                for column in numeric_columns
+            ]),
+            outputs=Schema([
+                TensorSpec(np.dtype("int64"), (-1,))
+            ]),
+        )
+
         # Registra el pipeline completo (imputación + escalado + K-Means).
         mlflow.sklearn.log_model(
             sk_model=pipeline,
-            artifact_path="model",
+            name="model",
             input_example=features.head(5),
-            serialization_format="cloudpickle",
+            serialization_format="skops",
+            skops_trusted_types=["numpy.dtype"],
+            signature=signature,
         )
 
         artifact_columns = [

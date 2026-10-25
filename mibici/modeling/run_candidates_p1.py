@@ -93,9 +93,9 @@ def log_candidate(
     validation = splits["validation"]
     test = splits["test"]
 
-    X_train, y_train = train[FEATURES], train[TARGET].astype(float)
-    X_val, y_val = validation[FEATURES], validation[TARGET].astype(float)
-    X_test, y_test = test[FEATURES], test[TARGET].astype(float)
+    X_train, y_train = train[FEATURES].astype("float64"), train[TARGET].astype("float64")
+    X_val, y_val = validation[FEATURES].astype("float64"), validation[TARGET].astype("float64")
+    X_test, y_test = test[FEATURES].astype("float64"), test[TARGET].astype("float64")
 
     model = make_model(name, params)
     model.fit(X_train, y_train)
@@ -123,14 +123,25 @@ def log_candidate(
 
         # Firma e input de ejemplo del modelo.
         example = X_train.head(5).copy()
+        example = example.astype("float64")
+
         medians = X_train.median(numeric_only=True)
-        example = example.fillna(medians)
-        signature = infer_signature(example, model.predict(example))
+        example = example.fillna(medians).astype("float64")
+
+        signature = infer_signature(
+            example, 
+            model.predict(example),
+        )
 
         mlflow.sklearn.log_model(
             sk_model=model,
             name="model",
-            serialization_format="cloudpickle",
+            serialization_format="skops",
+            skops_trusted_types=[
+                "numpy.dtype", 
+                "sklearn.tree._tree.Tree",
+                "sklearn.ensemble._hist_gradient_boosting.predictor.TreePredictor",
+            ],
             signature=signature,
             input_example=example,
         )
