@@ -115,7 +115,7 @@ La estructura exacta puede variar según los cambios integrados por el equipo. L
 
 ## 5. Requisitos del entorno
 
-El entorno de desarrollo verificado utiliza Python 3.14.7, MLflow 3.17.1, PyArrow 25.0.1, NumPy 2.5.4, pandas, scikit-learn, matplotlib y pytest. Las dependencias están fijadas en `requirements.txt`; `python_env.yaml` define el entorno usado por MLflow Projects.
+El entorno de desarrollo verificado utiliza Python 3.11.9, MLflow 3.17.1, PyArrow 25.0.1, NumPy 1.26.4, pandas 2.1.4, scikit-learn 1.5.2, matplotlib y pytest. Las dependencias están fijadas en `requirements.txt`; `python_env.yaml` define el entorno usado por MLflow Projects.
 
 Los siguientes comandos están escritos para Windows y PowerShell.
 
@@ -129,7 +129,7 @@ cd TC5061-Proyecto-Equipo47
 ### 5.2. Crear e instalar el entorno
 
 ```powershell
-py -3.14 -m venv .venv
+py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
@@ -339,7 +339,12 @@ Ejecutar las pruebas:
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-Las pruebas actuales verifican la normalización de nombres, el mapeo de columnas de estaciones, la interpretación de fechas y el rango mensual. La ingesta también debe validarse mediante los hashes del manifiesto y las fechas de los Parquet.
+![Ejecución Pytest](images\evidencia_PyTest.png)
+
+Las pruebas verifican la normalización de nombres, el mapeo de columnas de estaciones, la interpretación de fechas y el rango mensual. La ingesta también debe validarse mediante los hashes del manifiesto y las fechas de los Parquet.
+
+Adicionalmente se implementaron pruebas para verificar el correcto funcionamiento de las principales funciones del módulo de experimentación. Las pruebas validan el filtrado de registros por periodos temporales, el manejo de conjuntos de datos vacíos, la generación de matrices de características de referencia y el cálculo correcto de métricas de clasificación, como accuracy, balanced accuracy, precision, recall y F1-score. Asimismo, se verificó la reproducibilidad del algoritmo de agrupamiento K-Means mediante el uso de una semilla fija, comprobando que las ejecuciones con los mismos datos y parámetros produzcan resultados consistentes. También se incluyeron casos negativos para comprobar que las funciones generen excepciones cuando reciben datos o configuraciones inválidas.
+
 
 ## 13. Flujo de trabajo con GitHub
 

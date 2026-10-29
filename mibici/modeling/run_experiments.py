@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 
 import matplotlib
+from requests.packages import target
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import mlflow
@@ -31,6 +32,7 @@ from sklearn.metrics import (
     precision_score,
     r2_score,
     recall_score,
+    silhouette_score,
 )
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
@@ -51,6 +53,13 @@ from mibici.config import (
     VALIDATION_END_MONTH,
     VALIDATION_START_MONTH,
 )
+
+from mibici.validation.data_validation import (
+    validate_integrity,
+    validate_train_test,
+    validate_clustering_data,
+)
+
 
 app = typer.Typer(add_completion=False)
 FEATURES_DIR = PROCESSED_DATA_DIR / "features"
@@ -216,6 +225,26 @@ def run_p1(manifest: dict, manifest_hash: str, git_info: dict[str, str]) -> None
     splits = get_supervised_splits(frame)
     target = "target_trips_next_day"
 
+    for split_name, subset in splits.items():
+        report = validate_integrity(
+            subset,
+            required_columns=["target_date", "station_id", target],
+            unique_columns=["target_date", "station_id"],
+        )
+        logger.info(
+            f"Validación de integridad de {split_name}: {report}"
+        )
+
+    validation_result = validate_train_test(
+        splits["train"],
+        splits["test"],
+        target=target,
+    )
+
+    validation_result.save_as_html(
+        str(FIGURES_DIR / "p1_data_validation.html")
+    )
+
     y_train = splits["train"][target].astype(float)
     model = DummyRegressor(strategy="mean")
     model.fit(placeholder_x(len(y_train)), y_train)
@@ -328,6 +357,26 @@ def run_p2(manifest: dict, manifest_hash: str, git_info: dict[str, str]) -> None
     splits = get_supervised_splits(frame)
     target = "target_risk_station_next_day"
 
+    for split_name, subset in splits.items():
+        report = validate_integrity(
+            subset,
+            required_columns=["target_date", "station_id", target],
+            unique_columns=["target_date", "station_id"],
+        )
+        logger.info(
+            f"Validación de integridad de {split_name}: {report}"
+        )
+
+    validation_result = validate_train_test(
+        splits["train"],
+        splits["test"],
+        target=target,
+    )
+
+    validation_result.save_as_html(
+        str(FIGURES_DIR / "p2_data_validation.html")
+    )
+
     y_train = splits["train"][target].astype(int)
     model = DummyClassifier(strategy="most_frequent")
     model.fit(placeholder_x(len(y_train)), y_train)
@@ -403,7 +452,6 @@ def run_p2(manifest: dict, manifest_hash: str, git_info: dict[str, str]) -> None
 
     logger.success("Run de P2 registrado en MLflow.")
 
-
 def run_p3(
     manifest: dict,
     manifest_hash: str,
@@ -428,6 +476,15 @@ def run_p3(
     if not numeric_columns:
         raise ValueError("No se encontraron variables numéricas para clustering.")
 
+    result = validate_clustering_data(
+        frame=frame,
+        feature_columns=numeric_columns,
+    )
+
+    result.save_as_html(
+        str(FIGURES_DIR / "p3_data_validation.html")
+    )
+
     features = frame[numeric_columns].replace([np.inf, -np.inf], np.nan)
     imputer = SimpleImputer(strategy="median")
     imputed = imputer.fit_transform(features)
@@ -443,9 +500,6 @@ def run_p3(
 
     assignments = frame.copy()
     assignments["cluster"] = labels
-
-    # La silueta necesita al menos dos clusters y menos clusters que muestras.
-    from sklearn.metrics import silhouette_score
 
     silhouette = float(silhouette_score(scaled, labels))
     run_name = "P3-baseline-kmeans"
@@ -537,6 +591,15 @@ def run_p3_final(
     ]
     if not numeric_columns:
         raise ValueError("No se encontraron variables numéricas para clustering.")
+
+    result = validate_clustering_data(
+        frame=frame,
+        feature_columns=numeric_columns,
+    )
+
+    result.save_as_html(
+        str(FIGURES_DIR / "p3_final_data_validation.html")
+    )
 
     features = (
         frame[numeric_columns]

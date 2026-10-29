@@ -207,3 +207,4 @@ mlartifacts/
 
 # Base de datos SQLite local de MLflow
 /mlflow.db*
+
