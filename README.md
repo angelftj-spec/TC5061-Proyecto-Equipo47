@@ -345,6 +345,56 @@ Las pruebas verifican la normalización de nombres, el mapeo de columnas de esta
 
 Adicionalmente se implementaron pruebas para verificar el correcto funcionamiento de las principales funciones del módulo de experimentación. Las pruebas validan el filtrado de registros por periodos temporales, el manejo de conjuntos de datos vacíos, la generación de matrices de características de referencia y el cálculo correcto de métricas de clasificación, como accuracy, balanced accuracy, precision, recall y F1-score. Asimismo, se verificó la reproducibilidad del algoritmo de agrupamiento K-Means mediante el uso de una semilla fija, comprobando que las ejecuciones con los mismos datos y parámetros produzcan resultados consistentes. También se incluyeron casos negativos para comprobar que las funciones generen excepciones cuando reciben datos o configuraciones inválidas.
 
+### 12.1. Chequeos básicos de seguridad
+
+El repositorio incluye una revisión de seguridad mediante `pip-audit` para las dependencias y `Bandit` para el análisis estático del código Python.
+
+**Instalación de herramientas:**
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install pip-audit==2.10.1 bandit==1.9.4
+```
+
+**Ejecución de pruebas y verificación de dependencias:**
+
+```powershell
+.\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe -m pytest tests -v
+```
+
+**Auditoría de dependencias:**
+
+```powershell
+.\.venv\Scripts\python.exe -m pip_audit --local
+```
+
+**Análisis estático de seguridad:**
+
+```powershell
+.\.venv\Scripts\python.exe -m bandit -r mibici
+```
+
+Para generar los reportes JSON:
+
+```powershell
+New-Item -ItemType Directory -Force "reports\security" | Out-Null
+
+.\.venv\Scripts\python.exe -m pip_audit --local -f json -o reports/security/pip-audit.json
+
+.\.venv\Scripts\python.exe -m bandit -r mibici -f json -o reports/security/bandit.json
+```
+
+Las herramientas pueden finalizar con un código distinto de cero si detectan vulnerabilidades o patrones inseguros. En ese caso se deben revisar los hallazgos y no interpretar el resultado como un error de instalación.
+
+**Resultados de referencia del 1 de noviembre de 2026:**
+
+- PyTest: 20 pruebas aprobadas.
+- pip-audit: 59 registros de vulnerabilidad en 7 dependencias.
+- Bandit inicial: 9 hallazgos, incluidos 2 de severidad media.
+- Bandit después de aplicar controles de validación de URLs: 7 hallazgos de severidad baja, 0 medios y 0 altos.
+- Consulta al índice oficial de MiBici: exitosa.
+
+Los hallazgos restantes y sus recomendaciones se documentan en [Security Review](reports/security/security-review.md). La auditoría debe repetirse después de actualizar dependencias o modificar código relevante.
 
 ## 13. Flujo de trabajo con GitHub
 
