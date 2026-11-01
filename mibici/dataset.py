@@ -11,7 +11,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import unquote, urljoin, urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 import pandas as pd
 import typer
@@ -40,6 +40,49 @@ from mibici.config import (
 )
 
 app = typer.Typer(add_completion=False)
+ALLOWED_MIBICI_HOSTS = {"mibici.net", "www.mibici.net"}
+
+
+def validate_mibici_url(url: str) -> str:
+    """Permite únicamente HTTPS hacia los dominios oficiales de MiBici."""
+    parsed = urlparse(url)
+
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname not in ALLOWED_MIBICI_HOSTS
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.port not in (None, 443)
+    ):
+        raise ValueError(f"URL de MiBici no permitida: {url}")
+
+    return url
+
+
+class SafeMiBiciRedirectHandler(HTTPRedirectHandler):
+    """Comprueba el destino antes de seguir una redirección."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        validate_mibici_url(newurl)
+        return super().redirect_request(
+            req, fp, code, msg, headers, newurl
+        )
+
+
+def open_mibici_url(url: str):
+    """Abre una URL oficial aplicando las restricciones a los redirects."""
+    validate_mibici_url(url)
+
+    request = Request(
+        url,
+        headers={"User-Agent": "TC5061-Proyecto-Equipo47/1.0"},
+    )
+
+    opener = build_opener(SafeMiBiciRedirectHandler)
+    return opener.open(
+        request,
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
 
 # Nombres diferentes usados por el portal en distintos periodos.
 TRIP_COLUMN_ALIASES = {
@@ -167,7 +210,7 @@ def fetch_download_index() -> MiBiciLinkParser:
     )
 
     try:
-        with urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+        with open_mibici_url(MIBICI_OPEN_DATA_URL) as response:
             html = response.read().decode("utf-8", errors="replace")
     except (HTTPError, URLError, TimeoutError) as exc:
         raise RuntimeError(
@@ -217,7 +260,7 @@ def download_file(url: str, destination: Path, force: bool = False) -> None:
     )
 
     try:
-        with urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+        with open_mibici_url(url) as response:
             with temporary_path.open("wb") as output:
                 while True:
                     block = response.read(1024 * 1024)
