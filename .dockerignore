@@ -1,0 +1,20 @@
+
+# Excluir todo por defecto.
+**
+
+# Incluir definición y dependencias del contenedor.
+!Dockerfile
+!requirements-api.txt
+
+# Incluir código Python.
+!mibici/
+!mibici/**
+
+# Incluir únicamente el modelo P1 exportado.
+!models/
+!models/p1_serving/
+!models/p1_serving/**
+
+# Excluir archivos temporales de Python.
+**/__pycache__/
+**/*.pyc
