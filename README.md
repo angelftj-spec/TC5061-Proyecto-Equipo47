@@ -433,6 +433,351 @@ Las rutas de evidencia deben corresponder a los archivos realmente presentes en 
 - La selección final de P2 debe justificarse con los criterios usados por el equipo, dado que Random Forest tuvo un F1 de validación ligeramente mayor que HistGradientBoosting.
 - Debe comprobarse que las instrucciones de reproducción funcionen desde un clon limpio con las dependencias y los datos locales necesarios.
 
+
+## 16. Despliegue del modelo P1 como API REST con Docker
+
+**Para docentes y revisores:** consultar la sección 16.11 para reproducir la API desde un clon limpio, descargando el modelo desde GitHub Releases, sin necesidad de entrenar ni instalar MLflow.
+
+### 16.1. Descripción del servicio
+
+Se implementó una API REST con FastAPI para realizar inferencia en tiempo real utilizando el modelo de regresión P1 de MiBici, encargado de predecir la demanda de viajes iniciados al día siguiente.
+
+El servicio utiliza el modelo registrado en MLflow Model Registry y lo ejecuta dentro de un contenedor Docker compatible con el estándar OCI.
+
+**Tecnologías utilizadas:**
+
+- Python 3.11.9
+- FastAPI y Pydantic
+- MLflow Model Registry
+- scikit-learn
+- Docker
+
+**Modelo utilizado:**
+
+| Propiedad | Valor |
+|---|---|
+| Nombre | `mibici-equipo47-p1-demanda` |
+| Algoritmo | Random Forest Regressor |
+| Versión utilizada en las pruebas | `1` |
+| Alias de origen | `champion` |
+| Variables de entrada | 21 |
+| Formato de salida | JSON |
+
+La versión 1 corresponde a una reproducción local del modelo final P1 del proyecto, registrada con los mismos hiperparámetros principales. El registro incluye la cobertura temporal y el hash del archivo de características utilizado.
+
+### 16.2. Arquitectura
+
+El flujo de despliegue es:
+
+1. Recuperar una versión del modelo desde MLflow Model Registry.
+2. Exportar sus artefactos mediante `scripts/export_model.py`.
+3. Empaquetar la API y el modelo exportado dentro de una imagen Docker.
+4. Iniciar el contenedor y cargar el modelo durante el arranque de FastAPI.
+5. Recibir peticiones HTTP, validar las entradas con Pydantic y devolver predicciones JSON.
+
+El modelo se carga una sola vez al iniciar la aplicación. Las peticiones posteriores reutilizan el modelo en memoria.
+
+### 16.3. Requisitos
+
+- Docker Desktop con soporte para contenedores Linux, o un motor Docker compatible.
+- Python 3.11 para preparar los artefactos del modelo.
+- Acceso al modelo registrado en MLflow o a los datos procesados necesarios para reproducirlo.
+- Repositorio del Equipo 47.
+
+Los comandos siguientes están escritos para Windows PowerShell.
+
+### 16.4. Preparación del modelo
+
+**Ruta recomendada para evaluadores:** utilizar el GitHub Release y seguir la sección 16.11. Las opciones siguientes son alternativas para desarrolladores con acceso al Registry local o al dataset.
+
+El modelo final no se almacena directamente en GitHub. Los artefactos serializados y la base local `mlflow.db` están excluidos mediante `.gitignore`.
+
+Para construir la imagen, primero debe existir el modelo exportado en:
+
+`models/p1_serving/`
+
+**Opción A: utilizar un Registry local existente**
+
+Con el entorno Python configurado y el modelo registrado con alias `champion`, ejecutar:
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.export_model
+```
+
+El script descarga la versión registrada desde el Registry SQLite local y la guarda en `models/p1_serving/`, junto con sus metadatos de despliegue.
+
+**Opción B: reproducir y registrar el modelo P1**
+
+Si no se dispone del Registry original, se puede reproducir localmente el modelo a partir de:
+
+`data/processed/features/p1_regression.parquet`
+
+Este archivo no está incluido en GitHub. Debe obtenerse del pipeline de datos del proyecto o de un integrante autorizado del equipo.
+
+Una vez disponibles las dependencias y las características:
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.train_register_p1
+.\.venv\Scripts\python.exe -m scripts.export_model
+```
+
+El primer comando entrena y registra una reproducción local de P1, creando una versión en MLflow y asignando el alias `champion`. El segundo exporta los artefactos de esa versión.
+
+La exportación no sobrescribe automáticamente un directorio `models/p1_serving/` existente; se debe revisar antes de repetirla.
+
+**Importante:** un clon limpio del repositorio no contiene los datos procesados, la base MLflow ni el modelo serializado. Por ello, la construcción requiere obtener esos recursos o ejecutar el proceso de preparación previo.
+
+### 16.5. Construcción de la imagen Docker
+
+Desde la raíz del repositorio, después de exportar el modelo:
+
+```powershell
+docker build -t mibici-p1-api:1.0 .
+```
+
+El `Dockerfile` utiliza Python 3.11.9, instala las dependencias de `requirements-api.txt` y empaqueta la API junto con los artefactos exportados.
+
+La imagen establece las variables:
+
+- `MIBICI_MODEL_PATH=/app/models/p1_serving`
+- `MIBICI_MODEL_VERSION=1`
+
+La versión empaquetada en la imagen validada es la 1. Si se exporta otra versión, debe actualizarse el metadato de versión configurado en el Dockerfile.
+
+### 16.6. Ejecutar el contenedor
+
+```powershell
+docker run -d --name mibici-api -p 8001:8000 mibici-p1-api:1.0
+```
+
+Verificar que está en ejecución:
+
+```powershell
+docker ps
+```
+
+El servicio queda disponible en:
+
+- API: http://127.0.0.1:8001
+- Swagger UI: http://127.0.0.1:8001/docs
+- Health check: http://127.0.0.1:8001/health
+
+Para comprobar su estado:
+
+```powershell
+Invoke-RestMethod -Uri http://127.0.0.1:8001/health
+```
+
+Respuesta esperada para la imagen validada:
+
+```json
+{
+  "status": "ok",
+  "model_name": "mibici-equipo47-p1-demanda",
+  "model_version": "1"
+}
+```
+
+Para detener y eliminar el contenedor cuando ya no se necesite:
+
+```powershell
+docker stop mibici-api
+docker rm mibici-api
+```
+
+### 16.7. Endpoint de predicción
+
+**POST `/predict/demand`**
+
+Recibe un JSON con las 21 características del modelo P1, incluyendo actividad reciente, ubicación, capacidad, calendario, rezagos y promedios históricos.
+
+Pydantic valida las entradas y rechaza peticiones incompletas o incorrectas mediante respuestas HTTP `422`.
+
+El repositorio incluye una petición real de ejemplo en:
+
+`examples/demand_request.json`
+
+Para ejecutarla desde PowerShell:
+
+```powershell
+Invoke-RestMethod `
+    -Uri "http://127.0.0.1:8001/predict/demand" `
+    -Method POST `
+    -ContentType "application/json" `
+    -Body (Get-Content .\examples\demand_request.json -Raw) |
+    Format-List
+```
+
+**Respuesta obtenida en la prueba con Docker:**
+
+```json
+{
+  "predicted_trips_next_day": 23.16302985413153,
+  "model_name": "mibici-equipo47-p1-demanda",
+  "model_version": "1"
+}
+```
+
+El valor es una estimación de viajes iniciados al día siguiente, no un conteo observado ni una garantía de demanda real.
+
+### 16.8. Validación y pruebas
+
+Se implementaron pruebas automatizadas para verificar:
+
+- Disponibilidad del servicio mediante `/health`.
+- Predicción con una petición válida.
+- Rechazo de cantidades negativas.
+- Rechazo de campos faltantes o desconocidos.
+- Manejo de coordenadas nulas.
+- Generación correcta del esquema OpenAPI.
+
+Ejecutar la suite completa:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests/ -v
+```
+
+**Resultados de validación del 7 de noviembre de 2026:**
+
+- 27 pruebas aprobadas, sin fallos.
+- Imagen Docker construida correctamente.
+- Contenedor ejecutado en Linux.
+- Endpoint `/health` operativo.
+- Endpoint `/predict/demand` respondió HTTP 200.
+- Predicción local y predicción Docker idénticas para la misma entrada: diferencia absoluta de `0`.
+
+**Evidencia de predicción ejecutada desde Docker:**
+
+![Predicción MiBici desde FastAPI en Docker](images/evidencia_api_docker.png)
+
+### 16.9. Estrategia de despliegue elegida
+
+Se eligió la **inferencia en tiempo real mediante API REST**, ya que permite que una aplicación solicite predicciones individuales de demanda cuando las necesita.
+
+Esta estrategia facilita la integración futura con aplicaciones web, dashboards u otros servicios. Además, el modelo permanece cargado en memoria, evitando repetir el entrenamiento o la carga en cada petición.
+
+La API recibe las características previamente calculadas; la generación automática de variables históricas no forma parte de esta primera versión.
+
+Para generar predicciones masivas de todas las estaciones cada día, una arquitectura de inferencia por lotes podría ser más eficiente. Esa alternativa puede incorporarse en futuras etapas del proyecto.
+
+### 16.10. Limitaciones y próximos pasos
+
+- El modelo exportado debe estar disponible antes de construir la imagen.
+- Los datos de entrenamiento y la base local de MLflow no se publican en GitHub.
+- La versión desplegada debe identificarse y actualizarse explícitamente cuando cambie el modelo.
+- La API todavía no incorpora autenticación, monitorización de producción ni orquestación de microservicios.
+- El servicio está preparado como primera versión desplegable para su posterior integración en una arquitectura de microservicios.
+
+
+### 16.11. Reproducción completa desde un clon limpio mediante GitHub Release
+
+**Procedimiento recomendado para el profesor y los integrantes del equipo.** Validado el **7 de noviembre de 2026** desde un clon independiente del PR #7. Permite ejecutar FastAPI en Docker sin entrenar, sin instalar MLflow, sin tener `mlflow.db` y sin descargar los archivos Parquet utilizados durante el entrenamiento.
+
+**Requisitos:** Git, Windows PowerShell, Docker Desktop con contenedores Linux y conexión a Internet. La descarga se realiza con PowerShell, por lo que no hace falta instalar GitHub CLI.
+
+**Paso 1 — Clonar el código del PR #7.** Mientras el PR permanezca abierto:
+
+```powershell
+git clone --branch feat/diego-fastapi-docker --single-branch https://github.com/angelftj-spec/TC5061-Proyecto-Equipo47.git
+Set-Location .\TC5061-Proyecto-Equipo47
+```
+
+Después de que el PR se integre a `main`, basta con clonar el repositorio normalmente con `git clone https://github.com/angelftj-spec/TC5061-Proyecto-Equipo47.git`. Utilizar solo una alternativa y hacerlo desde una carpeta donde todavía no exista el clon.
+
+**Paso 2 — Descargar el modelo.** El archivo del [GitHub Release `mibici-p1-model-v1`](https://github.com/angelftj-spec/TC5061-Proyecto-Equipo47/releases/tag/mibici-p1-model-v1) pesa aproximadamente 21.08 MB y contiene el modelo MLflow completo. El archivo `model.pkl` ocupa 72.4 MB descomprimido.
+
+```powershell
+New-Item -ItemType Directory -Force .\dist | Out-Null
+
+Invoke-WebRequest `
+    -Uri "https://github.com/angelftj-spec/TC5061-Proyecto-Equipo47/releases/download/mibici-p1-model-v1/mibici-p1-model-v1.zip" `
+    -OutFile ".\dist\mibici-p1-model-v1.zip"
+```
+
+**Paso 3 — Verificar la integridad SHA256 del ZIP.** La huella publicada de este archivo es:
+
+```text
+82925710ddb70eb8dc09ad04d5c1f471bc8a007590f98d64e48f944eb9b04181
+```
+
+```powershell
+$expectedHash = "82925710ddb70eb8dc09ad04d5c1f471bc8a007590f98d64e48f944eb9b04181"
+$actualHash = (Get-FileHash ".\dist\mibici-p1-model-v1.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+
+if ($actualHash -ne $expectedHash) {
+    throw "SHA256 incorrecto: no cargar el modelo."
+}
+
+Write-Host "Integridad del ZIP verificada."
+```
+
+**Paso 4 — Extraer el modelo en la ruta que espera Docker.**
+
+```powershell
+New-Item -ItemType Directory -Force .\models\p1_serving | Out-Null
+
+Expand-Archive `
+    -Path ".\dist\mibici-p1-model-v1.zip" `
+    -DestinationPath ".\models\p1_serving" `
+    -Force
+
+if (-not (Test-Path ".\models\p1_serving\MLmodel") -or
+    -not (Test-Path ".\models\p1_serving\model.pkl")) {
+    throw "Faltan archivos del modelo MLflow exportado."
+}
+```
+
+La ruta correcta es `models/p1_serving/MLmodel`, sin carpetas intermedias adicionales. Los archivos exportados están excluidos de los commits por `.gitignore`, pero `.dockerignore` permite copiarlos durante la construcción de la imagen.
+
+**Paso 5 — Construir y ejecutar la imagen.** Se utiliza el puerto `8002` para evitar interferir con otras instancias locales.
+
+```powershell
+docker build -t mibici-p1-api:1.0 .
+
+docker run -d `
+    --name mibici-api-evaluacion `
+    -p 8002:8000 `
+    mibici-p1-api:1.0
+```
+
+**Paso 6 — Verificar el servicio y enviar una predicción.**
+
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:8002/health"
+
+Invoke-RestMethod `
+    -Uri "http://127.0.0.1:8002/predict/demand" `
+    -Method POST `
+    -ContentType "application/json" `
+    -Body (Get-Content ".\examples\demand_request.json" -Raw) |
+    Format-List
+```
+
+Resultado observado en la prueba:
+
+```text
+status: ok
+model_name: mibici-equipo47-p1-demanda
+model_version: 1
+
+predicted_trips_next_day: 23.16302985413153
+model_name: mibici-equipo47-p1-demanda
+model_version: 1
+```
+
+La documentación interactiva está en **http://127.0.0.1:8002/docs**. La [captura de evidencia](images/evidencia_api_docker.png) muestra el endpoint de predicción devolviendo HTTP 200.
+
+Para finalizar la prueba, si ya no se necesita el contenedor:
+
+```powershell
+docker stop mibici-api-evaluacion
+docker rm mibici-api-evaluacion
+```
+
+**Verificación desde un clon independiente:** inicialmente no existía `models/p1_serving/MLmodel`; después de descargar y extraer el ZIP publicado, la construcción Docker terminó correctamente y ambos endpoints respondieron con éxito. Docker reutilizó algunas capas de caché existentes en la máquina durante esta prueba, pero el código y los archivos del modelo procedían exclusivamente del clon y del Release.
+
+**Procedencia, seguridad y limitaciones:** el modelo publicado corresponde a una **reproducción local** del Random Forest P1 final, registrado con el alias `champion` y versión local 1; no es una copia certificada del Registry compartido del equipo. El archivo se distribuye como *prerelease* académico. Los modelos `pickle`/`cloudpickle` solo deben cargarse desde una fuente confiable, ya que la deserialización puede ejecutar código. El Dockerfile fija manualmente `MIBICI_MODEL_VERSION=1`, que debe actualizarse cuando cambie el artefacto; `scripts/export_model.py` utiliza SQLite local, pero **no interviene en este procedimiento basado en GitHub Release**. Las pruebas locales documentadas no sustituyen una ejecución independiente de CI/CD.
+
 ## Referencias
 
 MiBici. (s. f.). *Datos abiertos*. https://www.mibici.net/es/datos-abiertos/

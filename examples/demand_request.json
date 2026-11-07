@@ -1,0 +1,23 @@
+{
+  "departures": 30,
+  "arrivals": 26,
+  "latitud": 20.72201,
+  "longitud": -103.39427,
+  "capacidad": 19.0,
+  "day_of_week": 1,
+  "day_of_month": 29,
+  "month": 9,
+  "is_weekend": 0,
+  "day_of_week_sin": 0.7818314824680298,
+  "day_of_week_cos": 0.6234898018587336,
+  "month_sin": -0.8660254037844385,
+  "month_cos": -0.5000000000000004,
+  "departures_lag_1": 10.0,
+  "departures_lag_7": 26.0,
+  "departures_mean_prev_7d": 18.571428571428573,
+  "departures_mean_prev_28d": 18.285714285714285,
+  "arrivals_lag_1": 12.0,
+  "arrivals_lag_7": 26.0,
+  "arrivals_mean_prev_7d": 16.142857142857142,
+  "arrivals_mean_prev_28d": 15.071428571428571
+}

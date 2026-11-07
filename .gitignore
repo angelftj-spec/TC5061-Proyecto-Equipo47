@@ -216,3 +216,6 @@ mlartifacts/
 *.key
 *.p12
 *.pfx
+
+# Modelo exportado para construir la imagen Docker
+/models/p1_serving/
