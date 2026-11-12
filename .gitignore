@@ -208,3 +208,7 @@ mlartifacts/
 # Base de datos SQLite local de MLflow
 /mlflow.db*
 
+# Bases generadas por los notebooks
+notebooks/mibici/*.csv
+notebooks/data/produccion/*.csv
+notebooks/data/referencia/*.csv

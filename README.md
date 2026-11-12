@@ -84,6 +84,8 @@ TC5061-Proyecto-Equipo47/
 ├── docs/
 ├── models/
 ├── notebooks/
+│   ├── reports/
+│   ├── drift_report.html
 ├── reports/
 │   ├── evidencias/
 │   ├── figures/
