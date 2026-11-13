@@ -16,6 +16,8 @@ from mibici.dataset import (
     iter_months,
     normalize_columns,
     normalize_column_name,
+    validate_mibici_url,
+    SafeMiBiciRedirectHandler,
 )
 
 
@@ -266,3 +268,35 @@ def test_kmeans_es_reproducible_con_la_misma_semilla():
     np.testing.assert_array_equal(labels_1, labels_2)
     assert silhouette_1 == pytest.approx(silhouette_2)
     assert inertia_1 == pytest.approx(inertia_2)
+
+from urllib.request import Request
+
+def test_mibici_url_permite_https_oficial():
+    url = "https://www.mibici.net/site/assets/files/data.csv"
+    assert validate_mibici_url(url) == url
+
+
+@pytest.mark.parametrize("url", [
+    "http://www.mibici.net/data.csv",
+    "file:///etc/passwd",
+    "https://mibici.net.evil.example/data.csv",
+    "https://evil.example/data.csv",
+])
+def test_mibici_url_rechaza_destinos_inseguros(url):
+    with pytest.raises(ValueError, match="no permitida"):
+        validate_mibici_url(url)
+
+
+def test_mibici_redirect_rechaza_dominio_externo():
+    handler = SafeMiBiciRedirectHandler()
+    request = Request("https://www.mibici.net/data.csv")
+
+    with pytest.raises(ValueError, match="no permitida"):
+        handler.redirect_request(
+            request,
+            None,
+            302,
+            "Found",
+            {},
+            "https://evil.example/data.csv",
+        )
