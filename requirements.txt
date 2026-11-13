@@ -175,3 +175,4 @@ win32_setctime==1.2.0
 yarl==1.25.1
 zipp==4.1.1
 -e .
+evidently

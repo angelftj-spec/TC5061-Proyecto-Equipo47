@@ -208,14 +208,7 @@ mlartifacts/
 # Base de datos SQLite local de MLflow
 /mlflow.db*
 
-
-# Additional security protections
-.env.*
-!.env.example
-*.pem
-*.key
-*.p12
-*.pfx
-
-# Modelo exportado para construir la imagen Docker
-/models/p1_serving/
+# Bases generadas por los notebooks
+notebooks/mibici/*.csv
+notebooks/data/produccion/*.csv
+notebooks/data/referencia/*.csv
