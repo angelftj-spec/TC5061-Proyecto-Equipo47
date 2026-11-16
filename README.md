@@ -781,6 +781,133 @@ docker rm mibici-api-evaluacion
 
 **Procedencia, seguridad y limitaciones:** el modelo publicado corresponde a una **reproducción local** del Random Forest P1 final, registrado con el alias `champion` y versión local 1; no es una copia certificada del Registry compartido del equipo. El archivo se distribuye como *prerelease* académico. Los modelos `pickle`/`cloudpickle` solo deben cargarse desde una fuente confiable, ya que la deserialización puede ejecutar código. El Dockerfile fija manualmente `MIBICI_MODEL_VERSION=1`, que debe actualizarse cuando cambie el artefacto; `scripts/export_model.py` utiliza SQLite local, pero **no interviene en este procedimiento basado en GitHub Release**. Las pruebas locales documentadas no sustituyen una ejecución independiente de CI/CD.
 
+## 17. Monitoreo de drift, reentrenamiento y A/B testing
+
+Como parte de la etapa de monitoreo del proyecto se incorporó octubre de 2026 como un periodo nuevo de producción. El objetivo fue identificar cambios en la distribución de los datos mediante Evidently y evaluar si un modelo P1 entrenado con información más reciente mejora el desempeño frente al modelo histórico.
+
+### 17.1. Monitoreo de data drift con Evidently
+
+Para el análisis se definieron los siguientes conjuntos:
+
+| Conjunto | Periodo | Registros |
+|---|---|---:|
+| Referencia | Enero de 2023 – septiembre de 2026 | 16,833,133 |
+| Actual | Octubre de 2026 | 635,532 |
+
+El notebook utilizado es:
+
+`notebooks/1.0-monitoreo-evidently-oct2026.ipynb`
+
+y el reporte generado se encuentra en:
+
+`notebooks/reports/drift_report_octubre2026.html`
+
+La carga de datos filtra explícitamente los archivos por el rango temporal solicitado. Esto evita que archivos de otros periodos existentes en las carpetas locales sean incorporados accidentalmente en los conjuntos de referencia o producción.
+
+Con octubre de 2026 aislado como conjunto actual, Evidently detectó **dataset drift en 6 de las 8 variables comunes analizadas, equivalente al 75 %**.
+
+| Variable | Drift | Drift score |
+|---|---|---:|
+| `Viaje_Id` | Detectado | 1.79 |
+| `Usuario_Id` | Detectado | 0.63 |
+| `Año_de_nacimiento` | No detectado | 0.08 |
+| `Origen_Id` | Detectado | 0.30 |
+| `Destino_Id` | Detectado | 0.28 |
+| `Genero` | No detectado | 0.00 |
+| `Inicio_del_viaje` | Detectado | 0.99 |
+| `Fin_del_viaje` | Detectado | 0.99 |
+
+Los cambios en identificadores como `Viaje_Id` y `Usuario_Id` pueden ocurrir naturalmente conforme se generan nuevos registros. Por otro lado, el drift observado en `Origen_Id` y `Destino_Id` puede reflejar modificaciones reales en los patrones de movilidad y distribución de la demanda.
+
+Las variables `Inicio_del_viaje` y `Fin_del_viaje` también presentan drift elevado, aunque parte de esta diferencia es esperable al comparar periodos temporales distintos. `Año_de_nacimiento` y `Genero` permanecieron relativamente estables.
+
+El data drift se utiliza como una señal de monitoreo y no como evidencia directa de degradación del modelo. Para evaluar si los cambios observados afectan el desempeño predictivo se realizó un A/B test entre dos versiones del modelo P1.
+
+### 17.2. Modelo B con ventana temporal reciente
+
+El Modelo A conserva la configuración original del proyecto:
+
+| Conjunto | Periodo |
+|---|---|
+| Entrenamiento | Enero de 2023 – diciembre de 2025 |
+| Validación | Enero – junio de 2026 |
+| Prueba original | Julio – septiembre de 2026 |
+
+Para el Modelo B se utilizó una ventana de información más reciente:
+
+| Conjunto | Periodo |
+|---|---|
+| Entrenamiento | Enero de 2025 – junio de 2026 |
+| Validación | Julio – septiembre de 2026 |
+| Evaluación final | Octubre de 2026 |
+
+El Modelo B mantiene el mismo `RandomForestRegressor`, conjunto de características e hiperparámetros que el Modelo A. De esta forma, la principal diferencia experimental entre ambas versiones es la ventana temporal utilizada durante el entrenamiento.
+
+El script utilizado para entrenar y registrar el candidato reciente es:
+
+`scripts/train_register_p1_recent.py`
+
+Ejecutar desde la raíz del repositorio:
+
+```powershell
+.\.venv\Scripts\python.exe .\scripts\train_register_p1_recent.py
+```
+
+El modelo se registra bajo el mismo nombre de MLflow:
+
+`mibici-equipo47-p1-demanda`
+
+y se asigna el alias `candidate`, mientras que el modelo histórico conserva el alias `champion`.
+
+Los números concretos de versión pueden variar entre entornos debido a que `mlflow.db` es local y no se almacena en Git.
+
+### 17.3. A/B testing sobre octubre de 2026
+
+La comparación se realiza evaluando ambos modelos sobre exactamente el mismo conjunto de octubre de 2026, compuesto por **14,725 observaciones de 475 estaciones**.
+
+El script de comparación es:
+
+`scripts/ab_test_p1.py`
+
+Ejecutar:
+
+```powershell
+.\.venv\Scripts\python.exe .\scripts\ab_test_p1.py
+```
+
+El resumen de resultados se almacena en:
+
+`reports/ab_test_p1_oct2026.csv`
+
+Los resultados obtenidos fueron:
+
+| Métrica | Modelo A — histórico amplio | Modelo B — ventana reciente |
+|---|---:|---:|
+| MAE | 7.9824 | **7.9768** |
+| RMSE | 16.7240 | **16.2125** |
+| R² | 0.8817 | **0.8888** |
+
+El Modelo B presentó mejores resultados en las tres métricas. Sin embargo, la mejora en MAE fue de aproximadamente **0.07 %**, por lo que el error absoluto promedio de ambos modelos es prácticamente equivalente.
+
+La reducción del RMSE fue aproximadamente de **3.1 %**, mientras que el R² aumentó de 0.8817 a 0.8888. Esto sugiere que el modelo entrenado con información reciente presenta una mejora más visible en observaciones con errores de mayor magnitud.
+
+Los resultados apoyan parcialmente la hipótesis de que una ventana reciente puede representar mejor el comportamiento actual de MiBici, aunque el modelo entrenado con un histórico más amplio continúa presentando un desempeño competitivo.
+
+### 17.4. Estrategia de Continuous Training
+
+Con base en el monitoreo de drift y los resultados del A/B testing, se propone un esquema de **Continuous Training condicionado por monitoreo** en lugar de reentrenar automáticamente con cada nuevo periodo.
+
+El flujo recomendado es:
+
+1. Incorporar periódicamente nuevos datos publicados por MiBici.
+2. Ejecutar monitoreo de Data Drift y Data Quality con Evidently.
+3. Evaluar MAE y RMSE cuando estén disponibles los valores reales del periodo.
+4. Ante drift relevante o degradación sostenida, entrenar una nueva versión `candidate` utilizando información reciente.
+5. Comparar `candidate` contra `champion` sobre exactamente el mismo conjunto de evaluación.
+6. Promover el candidato únicamente cuando presente una mejora consistente.
+
+La ventana aproximada de 18 meses utilizada para el Modelo B puede considerarse una estrategia candidata de reentrenamiento. Sin embargo, el experimento actual evalúa un único periodo posterior, octubre de 2026, por lo que la ventana debe validarse nuevamente sobre futuros periodos antes de adoptarla como política definitiva.
+
 ## Referencias
 
 MiBici. (s. f.). *Datos abiertos*. https://www.mibici.net/es/datos-abiertos/
