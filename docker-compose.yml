@@ -1,0 +1,34 @@
+services:
+  api:
+    build: .
+    image: mibici-api:latest
+    container_name: mibici-api
+    ports:
+      - "8000:8000"
+    environment:
+      MIBICI_MODEL_PATH: /app/models/p1_serving
+      MIBICI_MODEL_VERSION: "1"
+    restart: unless-stopped
+
+  mlflow:
+    image: mibici-api:latest
+    container_name: mibici-mlflow
+    command:
+      - mlflow
+      - server
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+      - --backend-store-uri
+      - sqlite:////mlflow/mlflow.db
+      - --default-artifact-root
+      - file:///mlflow/artifacts
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+    restart: unless-stopped
+
+volumes:
+  mlflow_data:

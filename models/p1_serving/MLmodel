@@ -1,0 +1,51 @@
+artifact_path: file:C:/Angel/Maestria en Inteligencia Artificial Aplicada/Operaciones
+  de Aprendizaje Automatico/TC5061-Proyecto-Equipo47/mlruns/1/models/m-2d8573ca654742dd99e03bd599761ab1/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.14.7
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.9.1
+    skops_trusted_types: null
+is_signature_from_type_hint: false
+mlflow_version: 3.17.1
+model_id: m-2d8573ca654742dd99e03bd599761ab1
+model_size_bytes: 72431834
+model_uuid: m-2d8573ca654742dd99e03bd599761ab1
+prompts: null
+run_id: a5c48a44a54b4349a68610f1cc26fcb5
+saved_input_example_info:
+  artifact_path: input_example.json
+  pandas_orient: split
+  serving_input_path: serving_input_example.json
+  type: dataframe
+signature:
+  inputs: '[{"type": "double", "name": "departures", "required": true}, {"type": "double",
+    "name": "arrivals", "required": true}, {"type": "double", "name": "latitud", "required":
+    true}, {"type": "double", "name": "longitud", "required": true}, {"type": "double",
+    "name": "capacidad", "required": true}, {"type": "double", "name": "day_of_week",
+    "required": true}, {"type": "double", "name": "day_of_month", "required": true},
+    {"type": "double", "name": "month", "required": true}, {"type": "double", "name":
+    "is_weekend", "required": true}, {"type": "double", "name": "day_of_week_sin",
+    "required": true}, {"type": "double", "name": "day_of_week_cos", "required": true},
+    {"type": "double", "name": "month_sin", "required": true}, {"type": "double",
+    "name": "month_cos", "required": true}, {"type": "double", "name": "departures_lag_1",
+    "required": true}, {"type": "double", "name": "departures_lag_7", "required":
+    true}, {"type": "double", "name": "departures_mean_prev_7d", "required": true},
+    {"type": "double", "name": "departures_mean_prev_28d", "required": true}, {"type":
+    "double", "name": "arrivals_lag_1", "required": true}, {"type": "double", "name":
+    "arrivals_lag_7", "required": true}, {"type": "double", "name": "arrivals_mean_prev_7d",
+    "required": true}, {"type": "double", "name": "arrivals_mean_prev_28d", "required":
+    true}]'
+  outputs: '[{"type": "tensor", "tensor-spec": {"dtype": "float64", "shape": [-1]}}]'
+  params: null
+type_hint_from_example: false
+utc_time_created: '2026-10-22 23:49:46.593518'

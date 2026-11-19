@@ -1,14 +1,14 @@
-
 # API REST
 fastapi==0.143.0
 uvicorn==0.54.0
 pydantic==2.14.1
 
-# Inferencia de MLflow / scikit-learn
-mlflow-skinny==3.17.1
-scikit-learn==1.5.2
-numpy==1.26.4
-pandas==2.1.4
+# Inferencia MLflow
+mlflow==3.17.1
+scikit-learn==1.9.1
+numpy==2.5.4
+pandas==3.0.6
+scipy==1.18.1
 cloudpickle==3.1.2
 
 # Imports del paquete MiBici existente

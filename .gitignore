@@ -212,3 +212,10 @@ mlartifacts/
 notebooks/mibici/*.csv
 notebooks/data/produccion/*.csv
 notebooks/data/referencia/*.csv
+
+# Entornos virtuales adicionales
+.venv311/
+
+# Archivos de respaldo y revisiones temporales
+*.bak
+*.encoding_review.py
