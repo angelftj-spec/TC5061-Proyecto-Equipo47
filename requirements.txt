@@ -127,8 +127,8 @@ pytest==9.1.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.4
 python-json-logger==4.2.0
-pywin32==312
-pywinpty==3.0.5
+pywin32==312; sys_platform == "win32"
+pywinpty==3.0.5; sys_platform == "win32"
 PyYAML==6.0.3
 pyzmq==27.2.0
 referencing==0.37.0
@@ -171,7 +171,7 @@ webcolors==25.10.0
 webencodings==0.6.1
 websocket-client==1.9.2
 Werkzeug==3.1.9
-win32_setctime==1.2.0
+win32_setctime==1.2.0; sys_platform == "win32"
 yarl==1.25.1
 zipp==4.1.1
 -e .

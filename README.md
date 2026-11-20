@@ -908,6 +908,159 @@ El flujo recomendado es:
 
 La ventana aproximada de 18 meses utilizada para el Modelo B puede considerarse una estrategia candidata de reentrenamiento. Sin embargo, el experimento actual evalúa un único periodo posterior, octubre de 2026, por lo que la ventana debe validarse nuevamente sobre futuros periodos antes de adoptarla como política definitiva.
 
+## 18. Microservicios, CI/CD, pruebas de carga y FinOps
+
+Como parte de la evolución del proyecto, se implementó una arquitectura contenerizada para desplegar el modelo P1 de predicción de demanda, junto con un servicio de seguimiento de experimentos MLflow. La solución integra orquestación mediante Docker Compose, validación automatizada con GitHub Actions, pruebas de carga con Locust y monitoreo de recursos para estimar costos operativos.
+
+### 18.1. Arquitectura con Docker Compose
+
+La solución utiliza dos servicios:
+
+| Servicio | Descripción | Puerto |
+|---|---|---|
+| `mibici-api` | API REST FastAPI para inferencia del modelo P1 | 8000 |
+| `mibici-mlflow` | MLflow Tracking Server | 5000 |
+
+Ambos servicios reutilizan la imagen Docker `mibici-api:latest`, aunque MLflow se inicia mediante un comando diferente. El servicio MLflow utiliza SQLite como backend y un volumen persistente para almacenar la base de datos y los artefactos.
+
+La configuración se encuentra en `docker-compose.yml`.
+
+**Construir e iniciar los servicios:**
+
+```powershell
+docker compose up --build -d
+```
+
+**Verificar los contenedores:**
+
+```powershell
+docker compose ps
+```
+
+**Consultar los logs:**
+
+```powershell
+docker compose logs -f
+```
+
+**Detener los servicios:**
+
+```powershell
+docker compose down
+```
+
+La API queda disponible en:
+
+- API: http://localhost:8000
+- Swagger UI: http://localhost:8000/docs
+- Health check: http://localhost:8000/health
+
+MLflow queda disponible en:
+
+- MLflow UI: http://localhost:5000
+
+### 18.2. Integración continua con GitHub Actions
+
+Se implementó un workflow de CI en:
+
+`/.github/workflows/ci.yml`
+
+El pipeline se ejecuta ante pushes a las ramas del repositorio y Pull Requests dirigidos a `main`.
+
+Las etapas principales son:
+
+1. Configuración del entorno Python.
+2. Instalación de dependencias.
+3. Ejecución de pruebas automatizadas mediante PyTest.
+4. Construcción de la imagen Docker.
+
+La ejecución validada obtuvo **27 pruebas aprobadas**, además de una construcción correcta de la imagen.
+
+El workflow permite validar los cambios antes de integrarlos a la rama principal.
+
+### 18.3. Pruebas de carga con Locust
+
+Se utilizó Locust para evaluar el comportamiento de la API mediante solicitudes concurrentes al endpoint:
+
+`POST /predict/demand`
+
+Las solicitudes utilizaron datos sintéticos con un esquema válido. Se verificó que las respuestas fueran HTTP 200 y que incluyeran los campos esperados de la predicción.
+
+Las pruebas se realizaron durante dos minutos por escenario.
+
+| Usuarios concurrentes | Solicitudes | Throughput | Latencia promedio | P95 | Fallos |
+|---:|---:|---:|---:|---:|---:|
+| 10 | 738 | 6.21 req/s | 73.88 ms | 95 ms | 0 |
+| 25 | 1,875 | 15.67 req/s | 71.73 ms | 130 ms | 0 |
+| 50 | 3,669 | 30.68 req/s | 108.35 ms | 260 ms | 0 |
+
+El throughput aumentó aproximadamente de forma proporcional al número de usuarios concurrentes. No se registraron fallos durante las pruebas. Sin embargo, la latencia aumentó en el escenario de 50 usuarios, por lo que se recomienda continuar monitoreando el comportamiento del servicio ante cargas superiores.
+
+Los scripts y reportes se encuentran en:
+
+- `locustfile.py`
+- `reports/locust/`
+
+Las gráficas de resultados se encuentran en `reports/figures/`.
+
+### 18.4. Monitoreo de CPU y memoria
+
+Durante el escenario de 50 usuarios se monitorearon los recursos de ambos contenedores mediante `docker stats`.
+
+| Contenedor | CPU promedio | CPU máxima | RAM promedio | RAM máxima |
+|---|---:|---:|---:|---:|
+| `mibici-api` | 21.56% | 119.78% | 403.12 MiB | 409.4 MiB |
+| `mibici-mlflow` | 0.85% | 1.48% | 2,543.62 MiB | 2,543.62 MiB |
+
+La API presentó un consumo moderado de CPU y una memoria relativamente estable durante la prueba. MLflow presentó un consumo bajo de CPU, pero una línea base de memoria significativamente mayor.
+
+Las evidencias y datos de monitoreo se encuentran en `reports/locust/` y las gráficas correspondientes en `reports/figures/`.
+
+### 18.5. Estimación FinOps
+
+Para estimar el costo de operación se utilizó como referencia una instancia AWS EC2 `t3.large` Linux On-Demand en la región US East (N. Virginia).
+
+| Característica | Valor |
+|---|---|
+| Instancia | EC2 t3.large |
+| vCPU | 2 |
+| RAM | 8 GiB |
+| Precio estimado por hora | USD $0.0832 |
+| Horas mensuales consideradas | 730 |
+| Costo mensual estimado | USD $60.74 |
+
+El throughput medido localmente fue de aproximadamente 30.68 solicitudes por segundo. Se utilizó este valor para estimar un volumen teórico de inferencias durante un mes de 30 días.
+
+| Utilización hipotética | Inferencias mensuales estimadas | Costo por millón de inferencias |
+|---|---:|---:|
+| 1% | 795,198 | USD $76.38 |
+| 10% | 7,951,984 | USD $7.64 |
+| 100% | 79,519,839 | USD $0.76 |
+
+Esta estimación representa una extrapolación teórica basada en el throughput local; no constituye una validación de rendimiento en AWS. El costo considera únicamente la instancia de cómputo y excluye almacenamiento, transferencia de datos, monitoreo adicional, impuestos y posibles cargos asociados a créditos CPU de instancias T3.
+
+El costo unitario disminuye conforme aumenta la utilización de la infraestructura, debido a que un mayor número de solicitudes comparte el costo fijo mensual de la instancia.
+
+### 18.6. Recomendaciones de optimización
+
+A partir de los resultados obtenidos, se proponen las siguientes acciones:
+
+- Validar el rendimiento de la API en una instancia cloud real antes de utilizar la estimación como presupuesto definitivo.
+- Monitorear CPU, RAM, latencia P95 y tasa de errores.
+- Ajustar los recursos de infraestructura conforme a la demanda real.
+- Evaluar la optimización del consumo de memoria de MLflow.
+- Detener los recursos durante periodos sin utilización cuando no se requiera disponibilidad continua.
+- Evaluar Savings Plans o reservas únicamente cuando exista un patrón de uso estable.
+
+### 18.7. Evidencias
+
+Los reportes de Locust, los archivos CSV de resultados, las métricas de monitoreo y las gráficas generadas se encuentran en:
+
+- `reports/locust/`
+- `reports/figures/`
+
+El reporte académico de esta entrega documenta la arquitectura, metodología, resultados experimentales y estimación FinOps.
+
 ## Referencias
 
 MiBici. (s. f.). *Datos abiertos*. https://www.mibici.net/es/datos-abiertos/

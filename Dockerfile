@@ -1,5 +1,5 @@
 
-FROM python:3.11.9-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 # Configuración de Python y del modelo.
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -24,7 +24,10 @@ COPY mibici/ ./mibici/
 COPY models/p1_serving/ ./models/p1_serving/
 
 # Ejecutar con usuario no privilegiado.
-RUN useradd --create-home --uid 10001 appuser
+RUN useradd --create-home --uid 10001 appuser \
+    && mkdir -p /mlflow/artifacts \
+    && chown -R appuser:appuser /mlflow
+
 USER appuser
 
 EXPOSE 8000
