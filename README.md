@@ -893,6 +893,8 @@ La reducción del RMSE fue aproximadamente de **3.1 %**, mientras que el R² aum
 
 Los resultados apoyan parcialmente la hipótesis de que una ventana reciente puede representar mejor el comportamiento actual de MiBici, aunque el modelo entrenado con un histórico más amplio continúa presentando un desempeño competitivo.
 
+La comparación corresponde a una evaluación A/B offline sobre un conjunto común de octubre de 2026. No se realizó una asignación aleatoria de tráfico real entre modelos. Los números de versión incluidos en el CSV documentan aquella comparación y no deben interpretarse como las versiones actualmente disponibles en el Registry local.
+
 ### 17.4. Estrategia de Continuous Training
 
 Con base en el monitoreo de drift y los resultados del A/B testing, se propone un esquema de **Continuous Training condicionado por monitoreo** en lugar de reentrenar automáticamente con cada nuevo periodo.
@@ -978,6 +980,8 @@ La ejecución validada obtuvo **27 pruebas aprobadas**, además de una construcc
 
 El workflow permite validar los cambios antes de integrarlos a la rama principal.
 
+El workflow implementa integración continua (CI): instala dependencias, ejecuta las pruebas automatizadas mediante PyTest y construye la imagen Docker. Esta automatización valida los cambios antes de su integración a la rama principal. La publicación de la imagen y el despliegue automático a un entorno de producción no forman parte del workflow implementado.
+
 ### 18.3. Pruebas de carga con Locust
 
 Se utilizó Locust para evaluar el comportamiento de la API mediante solicitudes concurrentes al endpoint:
@@ -1060,6 +1064,18 @@ Los reportes de Locust, los archivos CSV de resultados, las métricas de monitor
 - `reports/figures/`
 
 El reporte académico de esta entrega documenta la arquitectura, metodología, resultados experimentales y estimación FinOps.
+
+### 18.8. Model Card y gobernanza del modelo
+
+Se documentó el modelo P1 mediante una Model Card que describe su propósito, datos de entrenamiento, configuración, métricas de evaluación, limitaciones, linaje y consideraciones de monitoreo.
+
+El documento se encuentra en:
+
+`docs/model_card_p1.md`
+
+La Model Card corresponde al modelo `mibici-equipo47-p1-demanda`, versión 1, identificado con el alias `champion` en MLflow Model Registry.
+
+Este documento facilita la trazabilidad y el uso responsable del modelo, y complementa los reportes de monitoreo y evaluación del proyecto.
 
 ## Referencias
 
